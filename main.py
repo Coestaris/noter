@@ -107,12 +107,15 @@ class SMUFLFont:
 
         return metadata
 
-    def __load_glyph(self, name: str):
+    def __load_glyph(self, name: str) -> Optional[TTFont]:
         codepoint = self.__metadata.get(name)
         if codepoint is None:
             return None
 
-        return self.font.getBestCmap().get(codepoint)
+        glyphSet = self.font.getGlyphSet()
+        cmap = self.font.getBestCmap()
+
+        return glyphSet.get(cmap.get(codepoint))
 
     def __init__(self, glyphnames: str, font_path: str):
         self.font_path = font_path
@@ -134,12 +137,13 @@ class SMUFLFont:
             logging.error("Failed to load font: %s", e)
             return False
 
-        # Make sure that font contains required symbols
+        # Make sure that metadata contains required symbols
         for symbol in self.__required_symbols:
             if symbol not in self.__metadata:
                 logging.error("Metadata does not contain symbol: %s", symbol)
                 return False
 
+        # Load required glyphs and cache them
         for symbol in self.__required_symbols:
             glyph = self.__load_glyph(symbol)
             if glyph is None:
@@ -147,6 +151,7 @@ class SMUFLFont:
                 return False
 
             self.__required_glyphs[symbol] = glyph
+            logging.debug("Loaded symbol: %s", symbol)
 
         logging.info("Loaded %d glyphs", len(self.__required_glyphs))
         return True
