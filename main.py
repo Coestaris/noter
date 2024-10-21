@@ -19,7 +19,8 @@ __version__ = "0.1.0"
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import QFont, QFontMetrics, QFontDatabase, QPainter, QColor, \
     QPen
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QApplication, QFrame
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QApplication, QFrame, \
+    QSizePolicy
 
 
 def setup_logging(args):
@@ -343,14 +344,14 @@ class Stave(QFrame):
     def set_width(self, width: float):
         self.setMinimumSize(int(width), self.height())
 
-    def __get_line_position(self, line: int) -> float:
+    def __get_line_position(self, line: float) -> float:
         return self.height() / 4 + 5 * self.__base_size - line * self.__base_size
 
     def paintEvent(self, a0):
         painter = QPainter(self)
 
         painter.setFont(self.__music_font.font())
-        painter.setPen(QPen(QColor(0, 0, 0), 2))
+        painter.setPen(QPen(QColor(0, 0, 0), self.__base_size * 2 / 24))
         painter.setBrush(QColor(0, 0, 0))
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
@@ -387,7 +388,7 @@ class Stave(QFrame):
         left_space = self.width() - x_offset
         for note in self.__notes:
             pos_x = x_offset + left_space * note.position # TODO: 4 is hardcoded
-            pos_y = self.__get_line_position(2)
+            pos_y = self.__get_line_position(2.5)
             glyph = None
             if note.duration == 1.0:
                 glyph = self.__symbol_whole_note
