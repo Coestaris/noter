@@ -388,7 +388,7 @@ class Stave(QFrame):
         left_space = self.width() - x_offset
         for note in self.__notes:
             pos_x = x_offset + left_space * note.position # TODO: 4 is hardcoded
-            pos_y = self.__get_line_position(2.5)
+            pos_y = self.__get_line_position(note.note) # TODO: Invalid NOTE !!!
             glyph = None
             if note.duration == 1.0:
                 glyph = self.__symbol_whole_note
