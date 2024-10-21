@@ -79,23 +79,38 @@ def parse_args():
 
 class SMUFLFont:
     class GlyphPromise:
-        def __init__(self, font: QFont, name: str):
+        def __init__(self, name: str):
             self.name = name
-            self.__font = font
             self.__glyph: Any = None
+            self.__font: Optional[QFont] = None
+            self.__width: float = 0
+            self.__height: float = 0
 
-        def load(self, codepoint: int):
+        def load(self, font: QFont, codepoint: int):
             if self.__glyph is not None:
                 raise Exception("Glyph is already loaded")
+
+            self.__font = font
 
             # QT does not provide a way to load glyph by codepoint.
             # It will be loaded and rendered by GUI application
             self.__glyph = chr(codepoint)
 
+            # Calculate width and height
+            rect = QFontMetrics(self.__font).boundingRectChar(self.__glyph)
+            self.__width = rect.width()
+            self.__height = rect.height()
+
         def glyph(self):
             if self.__glyph is None:
                 raise Exception("Glyph is not loaded")
             return self.__glyph
+
+        def width(self) -> float:
+            return self.__width
+
+        def height(self) -> float:
+            return self.__height
 
     @staticmethod
     def __load_metadata(glyphnames: str):
@@ -135,7 +150,7 @@ class SMUFLFont:
         self.__promised_glyphs: List[SMUFLFont.GlyphPromise] = []
 
     def promise_glyph(self, name: str) -> GlyphPromise:
-        promise = self.GlyphPromise(self.__font, name)
+        promise = self.GlyphPromise(name)
         self.__promised_glyphs.append(promise)
         return promise
 
@@ -197,7 +212,7 @@ class SMUFLFont:
             if not self.__check_glyph(promise.name):
                 logging.error("Font does not contain promised glyph: %s", promise.name)
                 return False
-            promise.load(self.__metadata[promise.name])
+            promise.load(self.__font, self.__metadata[promise.name])
 
         return True
 
@@ -341,18 +356,26 @@ class Stave(QFrame):
         self.__time_signature = TimeSignature.SIGNATURE_4_4
         self.__notes = []
 
-    def __get_char_size(self, glyph: SMUFLFont.GlyphPromise) -> Tuple[float, float]:
-        rect = QFontMetrics(self.__music_font.font()).boundingRectChar(glyph.glyph())
-        return rect.width(), rect.height()
+    def __get_line_from_note(self, note: Note) -> Optional[float]:
+        # Find note in scale
+        for line, n in self.__line_to_note_cache.items():
+            if n.note == note.note and n.octave == note.octave:
+                return line
 
-    def __get_line_from_note(self, note: Note, scale: Scale, clef: Clef) -> Optional[int]:
-        if clef == Clef.TREBLE:
+        logging.warning("Note is not in scale: %s", note)
+        return None
+
+    def __get_note_from_line(self, line: float) -> Optional[Note]:
+        return self.__line_to_note_cache.get(line)
+
+    def __build_cache(self):
+        if self.__clef == Clef.TREBLE:
             starting_note = 2 # In C major scale steps
             starting_octave = 4
-        elif clef == Clef.BASS:
+        elif self.__clef == Clef.BASS:
             starting_note = -3
             starting_octave = 3
-        elif clef == Clef.ALTO:
+        elif self.__clef == Clef.ALTO:
             starting_note = 0
             starting_octave = 4
 
@@ -369,28 +392,18 @@ class Stave(QFrame):
 
         ledger_down_extension = self.__allowed_ledger_lines[0] * 2 - 1 # In scale steps
         ledger_up_extension = self.__allowed_ledger_lines[1] * 2 + 1
-        notes = []
+        self.__line_to_note_cache = {}
         for n in range(ledger_down_extension, 5 * 2 + ledger_up_extension):
-            notes.append(get_cycled_note(n))
+            self.__line_to_note_cache[n / 2] = get_cycled_note(n)
 
-        # Find note in scale
-        index = next((i for i, n in enumerate(notes) if n.note == note.note and n.octave == note.octave), None)
-        if index is None:
-            logging.warning("Note is not in scale: %s", note)
-            return None
 
-        # Find line
-        index += ledger_down_extension
-        line = index // 2
-        if index % 2 == 1:
-            line += 0.5
-
-        return line
+    def __get_line_position(self, line: float) -> float:
+        return self.height() / 3 + 5 * self.__base_size - line * self.__base_size
 
     # All sizes will be relative to the size of the whole note
     def set_base_height(self, height: float = None):
         if height is None:
-            self.__base_size = self.__get_char_size(self.__symbol_whole_note)[1]
+            self.__base_size = self.__symbol_whole_note.height()
         else:
             self.__base_size = height
 
@@ -398,9 +411,6 @@ class Stave(QFrame):
 
     def set_width(self, width: float):
         self.setMinimumSize(int(width), self.height())
-
-    def __get_line_position(self, line: float) -> float:
-        return self.height() / 3 + 5 * self.__base_size - line * self.__base_size
 
     def paintEvent(self, a0):
         painter = QPainter(self)
@@ -424,13 +434,13 @@ class Stave(QFrame):
         x_offset = 0
         if self.__clef == Clef.TREBLE:
             painter.drawText(QPointF(0, self.__get_line_position(1)), self.__symbol_treble_clef.glyph())
-            x_offset += self.__get_char_size(self.__symbol_treble_clef)[0]
+            x_offset += self.__symbol_treble_clef.width()
         elif self.__clef == Clef.BASS:
             painter.drawText(QPointF(0, self.__get_line_position(2)), self.__symbol_bass_clef.glyph())
-            x_offset += self.__get_char_size(self.__symbol_bass_clef)[0]
+            x_offset += self.__symbol_bass_clef.width()
         elif self.__clef == Clef.ALTO:
             painter.drawText(QPointF(0, self.__get_line_position(2)), self.__symbol_alto_clef.glyph())
-            x_offset += self.__get_char_size(self.__symbol_alto_clef)[0]
+            x_offset += self.__symbol_alto_clef.width()
 
         # Draw scale
         pass
@@ -438,19 +448,19 @@ class Stave(QFrame):
         # Draw time signature
         if self.__time_signature == TimeSignature.SIGNATURE_2_4:
             painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_2_4.glyph())
-            x_offset += self.__get_char_size(self.__time_signature_2_4)[0]
+            x_offset += self.__time_signature_2_4.width()
         elif self.__time_signature == TimeSignature.SIGNATURE_3_4:
             painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_3_4.glyph())
-            x_offset += self.__get_char_size(self.__time_signature_3_4)[0]
+            x_offset += self.__time_signature_3_4.width()
         elif self.__time_signature == TimeSignature.SIGNATURE_4_4:
             painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_4_4.glyph())
-            x_offset += self.__get_char_size(self.__time_signature_4_4)[0]
+            x_offset += self.__time_signature_4_4.width()
         elif self.__time_signature == TimeSignature.SIGNATURE_6_8:
             painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_6_8.glyph())
-            x_offset += self.__get_char_size(self.__time_signature_6_8)[0]
+            x_offset += self.__time_signature_6_8.width()
         elif self.__time_signature == TimeSignature.SIGNATURE_8_8:
             painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_8_8.glyph())
-            x_offset += self.__get_char_size(self.__time_signature_8_8)[0]
+            x_offset += self.__time_signature_8_8.width()
 
         x_offset += self.width() * 0.1
 
@@ -461,7 +471,7 @@ class Stave(QFrame):
                 logging.warning("Note is out of bounds: %s", note)
                 continue
 
-            line = self.__get_line_from_note(note, self.__scale, self.__clef)
+            line = self.__get_line_from_note(note)
             if line is None:
                 continue
 
@@ -480,10 +490,9 @@ class Stave(QFrame):
             # Draw ledger lines
             if line <= -1 or line > 4.5:
                 ledger_y = self.__get_line_position(ceil(line))
-                note_size = self.__get_char_size(self.__symbol_whole_note)
                 painter.drawLine(
-                    QPointF(pos_x - note_size[0] / 3, ledger_y),
-                    QPointF(pos_x + note_size[0], ledger_y))
+                    QPointF(pos_x - self.__symbol_whole_note.width() / 3, ledger_y),
+                    QPointF(pos_x + self.__symbol_whole_note.width(), ledger_y))
 
             if glyph is not None:
                 painter.drawText(QPointF(pos_x, pos_y), glyph.glyph())
@@ -492,9 +501,11 @@ class Stave(QFrame):
 
     def set_clef(self, clef : Clef) -> None:
         self.__clef = clef
+        self.__build_cache()
 
     def set_scale(self, scale: Scale) -> None:
         self.__scale = scale
+        self.__build_cache()
 
     def set_time_signature(self, time_signature: TimeSignature) -> None:
         self.__time_signature = time_signature
