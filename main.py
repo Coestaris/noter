@@ -11,6 +11,7 @@ import json
 import os
 import platform
 from enum import Enum
+from math import floor, ceil
 from typing import Optional, Any, List, Tuple
 
 __description__ = ""
@@ -251,6 +252,17 @@ class Note:
         if self.note < Note.NOTE_C:
             self.note = Note.NOTE_B
 
+    @staticmethod
+    def number_to_name(note: int) -> str:
+        names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+        return names[note]
+
+    def __str__(self):
+        return f"Note(note={Note.number_to_name(self.note)}, octave={self.octave}, duration={self.duration}, position={self.position})"
+
+    def __repr__(self):
+        return str(self)
+
 class Scale:
     def __init__(self, sharps: List[int], flats: List[int]):
         self.sharps = sharps
@@ -293,10 +305,11 @@ class TimeSignature(Enum):
     SIGNATURE_8_8 = 4
 
 class Stave(QFrame):
-    def __init__(self, parent: QWidget, music_font: SMUFLFont):
+    def __init__(self, parent: QWidget, music_font: SMUFLFont, allowed_ledger_lines: Tuple[int, int] = (-2, 2)):
         super().__init__(parent)
 
         self.__music_font = music_font
+        self.__allowed_ledger_lines = allowed_ledger_lines
 
         # Request glyphs from font
         self.__symbol_treble_clef = music_font.promise_glyph("gClef")
@@ -332,6 +345,48 @@ class Stave(QFrame):
         rect = QFontMetrics(self.__music_font.font()).boundingRectChar(glyph.glyph())
         return rect.width(), rect.height()
 
+    def __get_line_from_note(self, note: Note, scale: Scale, clef: Clef) -> Optional[int]:
+        if clef == Clef.TREBLE:
+            starting_note = 2 # In C major scale steps
+            starting_octave = 4
+        elif clef == Clef.BASS:
+            starting_note = -3
+            starting_octave = 3
+        elif clef == Clef.ALTO:
+            starting_note = 0
+            starting_octave = 4
+
+        def get_cycled_note(offset: int) -> Note:
+            major_scale = [2, 2, 1, 2, 2, 2, 1]
+            n = offset + starting_note
+            if n < 0:
+                n = 7 + n
+            elif n >= 7:
+                n = n % 7
+            n = sum(major_scale[:n])
+
+            return Note(n % 12, starting_octave + (offset + starting_note) // 7)
+
+        ledger_down_extension = self.__allowed_ledger_lines[0] * 2 - 1 # In scale steps
+        ledger_up_extension = self.__allowed_ledger_lines[1] * 2 + 1
+        notes = []
+        for n in range(ledger_down_extension, 5 * 2 + ledger_up_extension):
+            notes.append(get_cycled_note(n))
+
+        # Find note in scale
+        index = next((i for i, n in enumerate(notes) if n.note == note.note and n.octave == note.octave), None)
+        if index is None:
+            logging.warning("Note is not in scale: %s", note)
+            return None
+
+        # Find line
+        index += ledger_down_extension
+        line = index // 2
+        if index % 2 == 1:
+            line += 0.5
+
+        return line
+
     # All sizes will be relative to the size of the whole note
     def set_base_height(self, height: float = None):
         if height is None:
@@ -339,13 +394,13 @@ class Stave(QFrame):
         else:
             self.__base_size = height
 
-        self.setMinimumSize(self.width(), int(self.__base_size * 10))
+        self.setMinimumSize(self.width(), int(self.__base_size * 12))
 
     def set_width(self, width: float):
         self.setMinimumSize(int(width), self.height())
 
     def __get_line_position(self, line: float) -> float:
-        return self.height() / 4 + 5 * self.__base_size - line * self.__base_size
+        return self.height() / 3 + 5 * self.__base_size - line * self.__base_size
 
     def paintEvent(self, a0):
         painter = QPainter(self)
@@ -355,6 +410,8 @@ class Stave(QFrame):
         painter.setBrush(QColor(0, 0, 0))
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+
+        # painter.fillRect(0, 0, self.width(), self.height(), QColor(30, 30, 30))
 
         # Draw stave
         for i in range(5):
@@ -379,16 +436,37 @@ class Stave(QFrame):
         pass
 
         # Draw time signature
-        painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_4_4.glyph())
-        x_offset += self.__get_char_size(self.__time_signature_4_4)[0]
+        if self.__time_signature == TimeSignature.SIGNATURE_2_4:
+            painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_2_4.glyph())
+            x_offset += self.__get_char_size(self.__time_signature_2_4)[0]
+        elif self.__time_signature == TimeSignature.SIGNATURE_3_4:
+            painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_3_4.glyph())
+            x_offset += self.__get_char_size(self.__time_signature_3_4)[0]
+        elif self.__time_signature == TimeSignature.SIGNATURE_4_4:
+            painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_4_4.glyph())
+            x_offset += self.__get_char_size(self.__time_signature_4_4)[0]
+        elif self.__time_signature == TimeSignature.SIGNATURE_6_8:
+            painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_6_8.glyph())
+            x_offset += self.__get_char_size(self.__time_signature_6_8)[0]
+        elif self.__time_signature == TimeSignature.SIGNATURE_8_8:
+            painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_8_8.glyph())
+            x_offset += self.__get_char_size(self.__time_signature_8_8)[0]
 
         x_offset += self.width() * 0.1
 
         # Draw notes
         left_space = self.width() - x_offset
         for note in self.__notes:
-            pos_x = x_offset + left_space * note.position # TODO: 4 is hardcoded
-            pos_y = self.__get_line_position(note.note) # TODO: Invalid NOTE !!!
+            if note.position + note.duration > 1.0:
+                logging.warning("Note is out of bounds: %s", note)
+                continue
+
+            line = self.__get_line_from_note(note, self.__scale, self.__clef)
+            if line is None:
+                continue
+
+            pos_x = x_offset + left_space * note.position
+            pos_y = self.__get_line_position(line)
             glyph = None
             if note.duration == 1.0:
                 glyph = self.__symbol_whole_note
@@ -398,6 +476,14 @@ class Stave(QFrame):
                 glyph = self.__symbol_quarter_note_up
             elif note.duration == 0.125:
                 glyph = self.__symbol_eighth_note_up
+
+            # Draw ledger lines
+            if line <= -1 or line > 4.5:
+                ledger_y = self.__get_line_position(ceil(line))
+                note_size = self.__get_char_size(self.__symbol_whole_note)
+                painter.drawLine(
+                    QPointF(pos_x - note_size[0] / 3, ledger_y),
+                    QPointF(pos_x + note_size[0], ledger_y))
 
             if glyph is not None:
                 painter.drawText(QPointF(pos_x, pos_y), glyph.glyph())
@@ -432,16 +518,21 @@ class NoterGUI(QWidget):
     def __init__(self, music_font: SMUFLFont):
         super().__init__()
 
-        self.__stave1 = Stave(self, music_font)
+        self.__stave1 = Stave(self, music_font, (-1, 1))
         self.__stave1.set_clef(Clef.TREBLE)
         self.__stave1.set_scale(Scale.C_MAJOR)
-        self.__stave1.set_time_signature(TimeSignature.SIGNATURE_4_4)
-        self.__stave1.put_note(Note(Note.NOTE_C, 4, 0.25, 0/4))
-        self.__stave1.put_note(Note(Note.NOTE_D, 4, 0.25, 1/4))
-        self.__stave1.put_note(Note(Note.NOTE_E, 4, 0.25, 2/4))
-        self.__stave1.put_note(Note(Note.NOTE_F, 4, 0.25, 3/4))
+        self.__stave1.set_time_signature(TimeSignature.SIGNATURE_8_8)
+        self.__stave1.put_note(Note(Note.NOTE_B, 3, 0.125, 7/8))
+        self.__stave1.put_note(Note(Note.NOTE_C, 4, 0.125, 0/8))
+        self.__stave1.put_note(Note(Note.NOTE_D, 4, 0.125, 1/8))
+        self.__stave1.put_note(Note(Note.NOTE_E, 4, 0.125, 2/8))
+        self.__stave1.put_note(Note(Note.NOTE_F, 4, 0.125, 3/8))
+        self.__stave1.put_note(Note(Note.NOTE_G, 4, 0.125, 4/8))
+        self.__stave1.put_note(Note(Note.NOTE_B, 5, 0.125, 5/8))
+        self.__stave1.put_note(Note(Note.NOTE_A, 5, 0.125, 6/8))
+        self.__stave1.put_note(Note(Note.NOTE_G, 5, 0.125, 7/8))
 
-        self.__stave2 = Stave(self, music_font)
+        self.__stave2 = Stave(self, music_font, (0, 0))
         self.__stave2.set_clef(Clef.BASS)
         self.__stave2.set_scale(Scale.C_MAJOR)
         self.__stave2.set_time_signature(TimeSignature.SIGNATURE_4_4)
