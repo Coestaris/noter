@@ -11,15 +11,15 @@ import json
 import os
 import platform
 from enum import Enum
-from typing import Optional, Any, List
+from typing import Optional, Any, List, Tuple
 
 __description__ = ""
 __version__ = "0.1.0"
 
 from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtGui import QFont, QFontMetrics, QFontDatabase, QPainter, QColor, \
-    QPixmap
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QApplication, QFrame
+    QPen
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QApplication, QFrame
 
 
 def setup_logging(args):
@@ -234,7 +234,7 @@ class Note:
     NOTE_B = 11
 
     # Duration in whole notes
-    def __init__(self, note: int, octave: int = 4, duration: float = 1.0, position: int = 0):
+    def __init__(self, note: int, octave: int = 4, duration: float = 1.0, position: float = 0):
         self.note = note
         self.octave = octave
         self.duration = duration
@@ -327,45 +327,79 @@ class Stave(QFrame):
         self.__time_signature = TimeSignature.SIGNATURE_4_4
         self.__notes = []
 
+    def __get_char_size(self, glyph: SMUFLFont.GlyphPromise) -> Tuple[float, float]:
+        rect = QFontMetrics(self.__music_font.font()).boundingRectChar(glyph.glyph())
+        return rect.width(), rect.height()
+
     # All sizes will be relative to the size of the whole note
     def set_base_height(self, height: float = None):
         if height is None:
-            rect = QFontMetrics(self.__music_font.font()).boundingRectChar(
-                self.__symbol_whole_note.glyph())
-            self.__base_size = rect.height()
+            self.__base_size = self.__get_char_size(self.__symbol_whole_note)[1]
         else:
             self.__base_size = height
 
-        self.setMinimumSize(self.width(), self.__base_size * 5)
+        self.setMinimumSize(self.width(), int(self.__base_size * 10))
 
     def set_width(self, width: float):
         self.setMinimumSize(int(width), self.height())
 
     def __get_line_position(self, line: int) -> float:
-        return 5 * self.__base_size - line * self.__base_size
+        return self.height() / 4 + 5 * self.__base_size - line * self.__base_size
 
     def paintEvent(self, a0):
         painter = QPainter(self)
 
         painter.setFont(self.__music_font.font())
-        painter.setPen(QColor(0, 0, 0))
+        painter.setPen(QPen(QColor(0, 0, 0), 2))
         painter.setBrush(QColor(0, 0, 0))
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
 
         # Draw stave
         for i in range(5):
+            y = self.__get_line_position(i)
             painter.drawLine(
-                QPointF(0, i * self.__base_size),
-                QPointF(self.parent().width(), i * self.__base_size))
+                QPointF(0, y),
+                QPointF(self.parent().width(), y))
 
         # Draw clef
+        x_offset = 0
         if self.__clef == Clef.TREBLE:
-            painter.drawText(0, self.__get_line_position(2), self.__symbol_treble_clef.glyph())
+            painter.drawText(QPointF(0, self.__get_line_position(1)), self.__symbol_treble_clef.glyph())
+            x_offset += self.__get_char_size(self.__symbol_treble_clef)[0]
         elif self.__clef == Clef.BASS:
-            painter.drawText(0, self.__get_line_position(2), self.__symbol_bass_clef.glyph())
+            painter.drawText(QPointF(0, self.__get_line_position(2)), self.__symbol_bass_clef.glyph())
+            x_offset += self.__get_char_size(self.__symbol_bass_clef)[0]
         elif self.__clef == Clef.ALTO:
-            painter.drawText(0, self.__get_line_position(2), self.__symbol_alto_clef.glyph())
+            painter.drawText(QPointF(0, self.__get_line_position(2)), self.__symbol_alto_clef.glyph())
+            x_offset += self.__get_char_size(self.__symbol_alto_clef)[0]
+
+        # Draw scale
+        pass
+
+        # Draw time signature
+        painter.drawText(QPointF(x_offset, self.__get_line_position(2)), self.__time_signature_4_4.glyph())
+        x_offset += self.__get_char_size(self.__time_signature_4_4)[0]
+
+        x_offset += self.width() * 0.1
+
+        # Draw notes
+        left_space = self.width() - x_offset
+        for note in self.__notes:
+            pos_x = x_offset + left_space * note.position # TODO: 4 is hardcoded
+            pos_y = self.__get_line_position(2)
+            glyph = None
+            if note.duration == 1.0:
+                glyph = self.__symbol_whole_note
+            elif note.duration == 0.5:
+                glyph = self.__symbol_half_note_up
+            elif note.duration == 0.25:
+                glyph = self.__symbol_quarter_note_up
+            elif note.duration == 0.125:
+                glyph = self.__symbol_eighth_note_up
+
+            if glyph is not None:
+                painter.drawText(QPointF(pos_x, pos_y), glyph.glyph())
 
         super().paintEvent(a0)
 
@@ -384,22 +418,43 @@ class Stave(QFrame):
 class NoterGUI(QWidget):
     def __init_ui(self):
         self.setMinimumSize(800, 600)
-        self.__stave.set_base_height()
-        self.__stave.set_width(self.width() * 0.9)
+        self.__stave1.set_base_height()
+        self.__stave1.set_width(self.width() * 0.9)
+        self.__stave2.set_base_height()
+        self.__stave2.set_width(self.width() * 0.9)
 
         layout = QVBoxLayout()
-        layout.addWidget(self.__stave, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.__stave1, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.__stave2, 0, Qt.AlignmentFlag.AlignCenter)
         self.setLayout(layout)
 
     def __init__(self, music_font: SMUFLFont):
         super().__init__()
-        self.__stave = Stave(self, music_font)
+
+        self.__stave1 = Stave(self, music_font)
+        self.__stave1.set_clef(Clef.TREBLE)
+        self.__stave1.set_scale(Scale.C_MAJOR)
+        self.__stave1.set_time_signature(TimeSignature.SIGNATURE_4_4)
+        self.__stave1.put_note(Note(Note.NOTE_C, 4, 0.25, 0/4))
+        self.__stave1.put_note(Note(Note.NOTE_D, 4, 0.25, 1/4))
+        self.__stave1.put_note(Note(Note.NOTE_E, 4, 0.25, 2/4))
+        self.__stave1.put_note(Note(Note.NOTE_F, 4, 0.25, 3/4))
+
+        self.__stave2 = Stave(self, music_font)
+        self.__stave2.set_clef(Clef.BASS)
+        self.__stave2.set_scale(Scale.C_MAJOR)
+        self.__stave2.set_time_signature(TimeSignature.SIGNATURE_4_4)
+        self.__stave2.put_note(Note(Note.NOTE_C, 3, 0.25, 0/4))
+        self.__stave2.put_note(Note(Note.NOTE_D, 3, 0.25, 1/4))
+        self.__stave2.put_note(Note(Note.NOTE_E, 3, 0.25, 2/4))
+        self.__stave2.put_note(Note(Note.NOTE_F, 3, 0.25, 3/4))
 
         if not music_font.load_font():
             raise Exception("Failed to load music font")
 
     def resizeEvent(self, a0):
-        self.__stave.set_width(self.width() * 0.9)
+        self.__stave1.set_width(self.width() * 0.9)
+        self.__stave2.set_width(self.width() * 0.9)
         super().resizeEvent(a0)
 
     def show(self):
