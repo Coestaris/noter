@@ -7,6 +7,7 @@
 #
 
 import logging
+from enum import Enum
 from math import ceil
 from typing import Tuple, Optional
 
@@ -59,11 +60,22 @@ class Stave(QFrame):
         self.__time_signature = None
         self.__notes = []
 
-    def __get_line_from_note(self, note: Note) -> Optional[float]:
+    class NoteMode(Enum):
+        NORMAL = 0,
+        SHARP = 1,
+        FLAT = 2,
+
+    def __get_line_from_note(self, note: Note) -> Optional[Tuple[float, NoteMode]]:
         # Find note in scale
         for line, n in self.__line_to_note_cache.items():
             if n.note == note.note and n.octave == note.octave:
-                return line
+                return line, self.NoteMode.NORMAL
+        for line, n in self.__line_to_note_cache.items():
+            if Note.sharp(n.note) == note.note and n.octave == note.octave:
+                return line, self.NoteMode.SHARP
+        for line, n in self.__line_to_note_cache.items():
+            if Note.flat(n.note) == note.note and n.octave == note.octave:
+                return line, self.NoteMode.FLAT
 
         logger.warning("Note is not in scale: %s", note)
         return None
@@ -184,9 +196,10 @@ class Stave(QFrame):
                 logger.warning("Note is out of bounds: %s", note)
                 continue
 
-            line = self.__get_line_from_note(note)
-            if line is None:
+            res = self.__get_line_from_note(note)
+            if res is None:
                 continue
+            line, mode = res
 
             pos_x = x_offset + left_space * note.position
             pos_y = self.__get_line_position(line)
@@ -216,6 +229,10 @@ class Stave(QFrame):
                     QPointF(pos_x - self.__symbol_whole_note.width() / 3, ledger_y),
                     QPointF(pos_x + self.__symbol_whole_note.width(), ledger_y))
 
+            if mode == self.NoteMode.SHARP:
+                painter.drawText(QPointF(pos_x - self.__symbol_sharp.width(), pos_y), self.__symbol_sharp.glyph())
+            elif mode == self.NoteMode.FLAT:
+                painter.drawText(QPointF(pos_x - self.__symbol_flat.width(), pos_y), self.__symbol_flat.glyph())
             if glyph is not None:
                 painter.drawText(QPointF(pos_x, pos_y), glyph.glyph())
 
@@ -249,4 +266,9 @@ class Stave(QFrame):
         self.__time_signature = time_signature
 
     def put_note(self, note: Note) -> None:
+        logger.debug("Adding note: %s", note)
         self.__notes.append(note)
+
+    def put_notes(self, notes: list[Note]) -> None:
+        logger.debug("Adding notes: %s", notes)
+        self.__notes = notes

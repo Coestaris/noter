@@ -30,20 +30,18 @@ class Note:
         self.duration = duration
         self.position = position
 
-    def sharp(self):
-        self.note += 1
-        if self.note > Note.NOTE_B:
-            self.note = Note.NOTE_C
-
-    def flat(self):
-        self.note -= 1
-        if self.note < Note.NOTE_C:
-            self.note = Note.NOTE_B
-
     @staticmethod
     def number_to_name(note: int) -> str:
         names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-        return names[note]
+        return names[note % 12]
+
+    @staticmethod
+    def sharp(note: int) -> int:
+        return (note + 1) % 12
+
+    @staticmethod
+    def flat(note: int) -> int:
+        return (note - 1) % 12
 
     def __str__(self):
         return f"Note(note={Note.number_to_name(self.note)}, octave={self.octave}, duration={self.duration}, position={self.position})"
