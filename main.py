@@ -384,11 +384,11 @@ class Challenge:
         def random_note() -> Tuple[int, bool]:
             clef = random.choice([Clef.TREBLE, Clef.BASS])
             if clef == Clef.TREBLE:
-                min_note = Note.NOTE_C + 12 * 4
-                max_note = Note.NOTE_F + 12 * 5
+                min_note = Note.NOTE_A_SHARP + 12 * 3
+                max_note = Note.NOTE_C + 12 * 6
             else:
                 min_note = Note.NOTE_C + 12 * 2
-                max_note = Note.NOTE_F + 12 * 3
+                max_note = Note.NOTE_D_SHARP + 12 * 4
 
             return random.randint(min_note, max_note), clef == Clef.TREBLE
 
@@ -438,10 +438,10 @@ class Challenge:
 
         self.__total_answers += 1
         if from_keyboard:
-            if note.note in [n.note for n in self.notes]:
-                self.__correct_answers += 1
-                self.spawn_notes()
-                return True
+            # if note.note in [n.note for n in self.notes]:
+            self.__correct_answers += 1
+            self.spawn_notes()
+            return True
 
         return False
 
@@ -587,11 +587,11 @@ class NoterGUI(QWidget):
         self.__second_timer.timeout.connect(lambda: self.__second_timer_tick())
         self.__seconds_in_game = 0
 
-        self.__stave1 = Stave(self, music_font, (-1, 1), 10, 3)
+        self.__stave1 = Stave(self, music_font, (-1, 1), 10, 4)
         self.__stave1.set_clef(Clef.TREBLE)
         self.__stave1.set_scale(Scale.C_MAJOR)
 
-        self.__stave2 = Stave(self, music_font, (-1, 1), 10, 8)
+        self.__stave2 = Stave(self, music_font, (-1, 1), 10, 6)
         self.__stave2.set_clef(Clef.BASS)
         self.__stave2.set_scale(Scale.C_MAJOR)
 

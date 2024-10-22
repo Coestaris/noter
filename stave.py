@@ -8,7 +8,7 @@
 
 import logging
 from enum import Enum
-from math import ceil
+from math import ceil, floor
 from typing import Tuple, Optional
 
 from PyQt6.QtCore import QPointF
@@ -224,7 +224,8 @@ class Stave(QFrame):
 
             # Draw ledger lines
             if line <= -1 or line > 4.5:
-                ledger_y = self.__get_line_position(ceil(line))
+                l = ceil(line) if line <= -1 else floor(line)
+                ledger_y = self.__get_line_position(l)
                 painter.drawLine(
                     QPointF(pos_x - self.__symbol_whole_note.width() / 3, ledger_y),
                     QPointF(pos_x + self.__symbol_whole_note.width(), ledger_y))
