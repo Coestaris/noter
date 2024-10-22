@@ -457,7 +457,7 @@ class NoterGUI(QWidget):
     def __update_status(self):
         text = ""
         if self.__settings.display_timer:
-            text += f"{self.__seconds_in_game//3600}:{self.__seconds_in_game//60}:{self.__seconds_in_game % 60}\n"
+            text += f"{self.__seconds_in_game//3600:02}:{self.__seconds_in_game//60:02}:{self.__seconds_in_game % 60:02}\n"
         if self.__settings.display_score:
             correct = self.__challenge.get_correct_answers()
             total = self.__challenge.get_total_answers()
