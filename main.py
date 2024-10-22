@@ -434,7 +434,7 @@ class Challenge:
         return self.__total_answers
 
     def feed_note_start(self, note: Note, from_keyboard: bool) -> bool:
-        logging.info("Feed note: %s", note)
+        logging.debug("Feed note: %s", note)
 
         self.__total_answers += 1
         if from_keyboard:
@@ -449,10 +449,15 @@ class Challenge:
         pass
 
 class NoterGUI(QWidget):
+    def reset_buttons(self):
+        for b in self.buttons:
+            b.setStyleSheet("")
+            b.setEnabled(True)
+
     def __update_status(self):
         text = ""
         if self.__settings.display_timer:
-            text += f"{self.__seconds_in_game//3600}:{self.__seconds_in_game//60}:{self.__seconds_in_game}\n"
+            text += f"{self.__seconds_in_game//3600}:{self.__seconds_in_game//60}:{self.__seconds_in_game % 60}\n"
         if self.__settings.display_score:
             correct = self.__challenge.get_correct_answers()
             total = self.__challenge.get_total_answers()
@@ -476,7 +481,7 @@ class NoterGUI(QWidget):
     def __game_start(self):
         self.__challenge.reset_game(self.__settings)
         self.start_button.setText("End")
-        self.start_button.setStyleSheet("background-color: #FF6347")
+        self.start_button.setStyleSheet("")
         self.start_button.disconnect()
         self.start_button.clicked.connect(lambda: self.__game_end())
         self.settings_button.setEnabled(False)
@@ -495,6 +500,7 @@ class NoterGUI(QWidget):
         self.keyboard.setEnabled(False)
         self.__second_timer.stop()
         self.__seconds_in_game = 0
+        self.reset_buttons()
 
     def __init_ui(self):
         self.__stave1.set_base_height()
@@ -533,7 +539,7 @@ class NoterGUI(QWidget):
         keyboard_layout.setContentsMargins(0, 0, 0, 0)
         self.keyboard.setLayout(keyboard_layout)
         layout.addWidget(self.keyboard)
-        buttons = []
+        self.buttons = []
         def add_button(note: int, row: int, col: int):
             button = QPushButton(Note.number_to_name(note))
             button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -542,9 +548,7 @@ class NoterGUI(QWidget):
                     button.setStyleSheet("background-color: #FF6347")
                     button.setEnabled(False)
                 else:
-                    for b in buttons:
-                        b.setStyleSheet("")
-                        b.setEnabled(True)
+                    self.reset_buttons()
                     self.update()
                 self.__update_status()
             button.clicked.connect(feed_note)
@@ -554,7 +558,7 @@ class NoterGUI(QWidget):
             keyboard_layout.setColumnStretch(col, 1)
             keyboard_layout.setRowStretch(row, 1)
             keyboard_layout.setRowMinimumHeight(row, 50)
-            buttons.append(button)
+            self.buttons.append(button)
 
         add_button(Note.NOTE_C, 1, 1)
         add_button(Note.NOTE_D, 1, 2)
@@ -600,6 +604,12 @@ class NoterGUI(QWidget):
     def resizeEvent(self, a0):
         self.__stave1.set_width(self.width() * 0.9)
         self.__stave2.set_width(self.width() * 0.9)
+        # Make buttons text bigger
+
+        f = self.buttons[0].font()
+        f.setPointSize(12 + self.buttons[0].height() // 30)
+        for b in self.buttons:
+            b.setFont(f)
         super().resizeEvent(a0)
 
     def show(self):
