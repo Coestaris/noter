@@ -14,7 +14,7 @@ import os
 import random
 from typing import Optional, Tuple, List
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QFile, QTextStream
 from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTabWidget, QWidget, \
     QCheckBox, QLabel, QHBoxLayout, QSpinBox, QPushButton, QSizePolicy, \
     QGridLayout, QComboBox, QGroupBox, QRadioButton, QApplication
@@ -137,6 +137,28 @@ class SettingsWindow(QDialog):
         challenge_widget.setLayout(challenge_layout)
         challenge_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         tab_widget.addTab(challenge_widget, "Challenge")
+
+        def switch_theme(path):
+            app = QApplication.instance()
+            if app is None:
+                raise RuntimeError("No Qt Application found.")
+
+            file = QFile(path)
+            file.open(QFile.OpenModeFlag.ReadOnly | QFile.OpenModeFlag.Text)
+            stream = QTextStream(file)
+            app.setStyleSheet(stream.readAll())
+
+        theme_group = QGroupBox("Theme")
+        challenge_layout.addWidget(theme_group)
+        theme_layout = QVBoxLayout()
+        theme_group.setLayout(theme_layout)
+        theme_layout.addWidget(radio := QRadioButton("Use Dark theme"))
+        radio.setChecked(False)
+        radio.toggled.connect(lambda: switch_theme("resources/dark.qss"))
+        theme_layout.addWidget(radio := QRadioButton("Use Light theme"))
+        radio.setChecked(True)
+        radio.toggled.connect(lambda: switch_theme("resources/light.qss"))
+
         self.display_timer_checkbox = QCheckBox("Display timer")
         self.display_timer_checkbox.setChecked(settings.display_timer)
         challenge_layout.addWidget(self.display_timer_checkbox)
@@ -432,7 +454,19 @@ class NoterGUI(QWidget):
         if self.__settings.display_timer:
             text += f"{self.__seconds_in_game//3600}:{self.__seconds_in_game//60}:{self.__seconds_in_game}\n"
         if self.__settings.display_score:
-            text += f" Score: {self.__challenge.get_correct_answers()}/{self.__challenge.get_total_answers()}"
+            correct = self.__challenge.get_correct_answers()
+            total = self.__challenge.get_total_answers()
+            # Colorgrade score
+            all_ok_hue = 120 # Green
+            all_wrong_hue = 0 # Red
+            if total == 0:
+                color = "hsl(0, 0%, 50%)"
+                text += "0/0 (0.0%)"
+            else:
+                # Linear interpolation between all_ok_color and all_wrong_color
+                color = f"hsl({all_wrong_hue + (all_ok_hue - all_wrong_hue) * correct/total}, 100%, 40%)"
+                text += f"{correct}/{total} ({correct/total*100:.1f}%)"
+            self.status_label.setStyleSheet(f"color: {color}; font-size: 20pt")
         self.status_label.setText(text)
 
     def __second_timer_tick(self):
@@ -472,8 +506,8 @@ class NoterGUI(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.status_label = QLabel("Press 'Start'\nto begin")
+        self.status_label.setStyleSheet(f"color: hsl(0, 0%, 50%); font-size: 20pt")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
-        self.status_label.setStyleSheet("font-size: 12pt")
         layout.addWidget(self.status_label, 0, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.__stave1, 0, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.__stave2, 0, Qt.AlignmentFlag.AlignTop)
