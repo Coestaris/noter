@@ -805,7 +805,39 @@ class SettingsWindow(QDialog):
 
         return settings
 
+class Challenge:
+    def __init__(self, stave_treble: Stave, stave_bass: Stave):
+        self.__stave_treble = stave_treble
+        self.__stave_bass = stave_bass
+
+        self.__correct_answers = 0
+        self.__total_answers = 0
+
+    def new_round(self, settings: Settings) -> bool:
+        pass
+
+    def get_correct_answers(self) -> int:
+        pass
+
+    def get_total_answers(self) -> int:
+        pass
+
+    def feed_note_start(self, note: Note) -> bool:
+        pass
+
+    def feed_note_end(self, note: Note) -> bool:
+        pass
+
 class NoterGUI(QWidget):
+    def __game_start(self):
+        self.__challenge.new_round(self.__settings)
+        self.start_button.setText("End")
+        self.start_button.setStyleSheet("background-color: #98FB98")
+
+    def __game_end(self):
+        self.start_button.setText("Start")
+        self.start_button.setStyleSheet("background-color: #FF6347")
+
     def __init_ui(self):
         self.__stave1.set_base_height()
         self.__stave1.set_width(self.width() * 0.9)
@@ -825,8 +857,7 @@ class NoterGUI(QWidget):
 
         self.start_button = QPushButton("Start")
         self.start_button.setMinimumHeight(50)
-        # Make background color pale green
-        self.start_button.setStyleSheet("background-color: #98FB98")
+        self.start_button.clicked.connect(lambda: self.__game_start())
         layout.addWidget(self.start_button, 0, Qt.AlignmentFlag.AlignTop)
 
         settings_button = QPushButton("Settings")
@@ -883,6 +914,7 @@ class NoterGUI(QWidget):
         keyboard.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self.setLayout(layout)
+        self.__game_end()
 
     def __init__(self, music_font: SMUFLFont):
         super().__init__()
@@ -896,6 +928,8 @@ class NoterGUI(QWidget):
         self.__stave2 = Stave(self, music_font, (-1, 1), 10, 8)
         self.__stave2.set_clef(Clef.BASS)
         self.__stave2.set_scale(Scale.C_MAJOR)
+
+        self.__challenge = Challenge(self.__stave1, self.__stave2)
 
         self.__music_font = music_font
         if not self.__music_font.load_font():
