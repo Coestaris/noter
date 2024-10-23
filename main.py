@@ -438,10 +438,10 @@ class Challenge:
 
         self.__total_answers += 1
         if from_keyboard:
-            # if note.note in [n.note for n in self.notes]:
-            self.__correct_answers += 1
-            self.spawn_notes()
-            return True
+            if note.note in [n.note for n in self.notes]:
+                self.__correct_answers += 1
+                self.spawn_notes()
+                return True
 
         return False
 
