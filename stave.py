@@ -156,7 +156,7 @@ class Stave(QFrame):
         if self.__clef == Clef.TREBLE:
             x_offset = draw_and_offset(1, self.__symbol_treble_clef, x_offset)
         elif self.__clef == Clef.BASS:
-            x_offset = draw_and_offset(2, self.__symbol_bass_clef, x_offset)
+            x_offset = draw_and_offset(3, self.__symbol_bass_clef, x_offset)
         elif self.__clef == Clef.ALTO:
             x_offset = draw_and_offset(2, self.__symbol_alto_clef, x_offset)
 
