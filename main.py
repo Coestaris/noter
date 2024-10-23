@@ -471,7 +471,7 @@ class NoterGUI(QWidget):
                 # Linear interpolation between all_ok_color and all_wrong_color
                 color = f"hsl({all_wrong_hue + (all_ok_hue - all_wrong_hue) * correct/total}, 100%, 40%)"
                 text += f"{correct}/{total} ({correct/total*100:.1f}%)"
-            self.status_label.setStyleSheet(f"color: {color}; font-size: 20pt")
+            self.status_label.setStyleSheet(f"color: {color}; font-size: 16pt")
         self.status_label.setText(text)
 
     def __second_timer_tick(self):
@@ -512,7 +512,7 @@ class NoterGUI(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.status_label = QLabel("Press 'Start'\nto begin")
-        self.status_label.setStyleSheet(f"color: hsl(0, 0%, 50%); font-size: 20pt")
+        self.status_label.setStyleSheet(f"color: hsl(0, 0%, 50%); font-size: 16pt")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignHCenter)
         layout.addWidget(self.status_label, 0, Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.__stave1, 0, Qt.AlignmentFlag.AlignTop)
