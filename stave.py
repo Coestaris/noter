@@ -227,8 +227,8 @@ class Stave(QFrame):
                 l = ceil(line) if line <= -1 else floor(line)
                 ledger_y = self.__get_line_position(l)
                 painter.drawLine(
-                    QPointF(pos_x - self.__symbol_whole_note.width() / 3, ledger_y),
-                    QPointF(pos_x + self.__symbol_whole_note.width(), ledger_y))
+                    QPointF(pos_x - self.__symbol_whole_note.width() / 4, ledger_y),
+                    QPointF(pos_x + self.__symbol_whole_note.width() * 5 / 4, ledger_y))
 
             if mode == self.NoteMode.SHARP:
                 painter.drawText(QPointF(pos_x - self.__symbol_sharp.width(), pos_y), self.__symbol_sharp.glyph())
