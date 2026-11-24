@@ -3,7 +3,7 @@
 #
 # @file stave.py
 # @date 22-10-2024
-# @author Maxim Kurylko <vk_vm@ukr.net>
+# @author Maxim Kurylko <kurylko.maxim@gmail.com>
 #
 
 import logging

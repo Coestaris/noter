@@ -3,7 +3,7 @@
 #
 # @file ${FILE_NAME}
 # @date ${DAY}-${MONTH}-${YEAR}
-# @author Maxim Kurylko <vk_vm@ukr.net>
+# @author Maxim Kurylko <kurylko.maxim@gmail.com>
 #
  
 def main():

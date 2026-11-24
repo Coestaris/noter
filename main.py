@@ -3,7 +3,7 @@
 #
 # @file main.py
 # @date 18-10-2024
-# @author Maxim Kurylko <vk_vm@ukr.net>
+# @author Maxim Kurylko <kurylko.maxim@gmail.com>
 #
 
 __description__ = ""
